@@ -6,10 +6,36 @@ import { initialActionState } from "@/lib/action";
 import { Alert, Button, Card, Field, Input } from "@/components/ui/primitives";
 import { SubmitButton } from "@/components/ui/action-form";
 
-export function LoginForm({ next, error, sso }: { next?: string; error?: string; sso: "google" | "azure" | "none" }) {
+export function LoginForm({
+  next,
+  error,
+  sso,
+  resetByEmail,
+}: {
+  next?: string;
+  error?: string;
+  sso: "google" | "azure" | "none";
+  resetByEmail: boolean;
+}) {
   const [mode, setMode] = useState<"signin" | "reset">("signin");
   const [state, action] = useActionState(signIn, initialActionState);
   const [resetState, resetAction] = useActionState(requestPasswordReset, initialActionState);
+
+  if (mode === "reset" && !resetByEmail) {
+    return (
+      <Card className="p-6">
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-foreground">Password reset emails are not set up yet.</p>
+          <p className="text-sm text-muted">
+            Ask HR (or IT, if you have signed in before) for a one-time password reset link. They will send it to you directly on company chat.
+          </p>
+          <Button type="button" variant="ghost" onClick={() => setMode("signin")}>
+            Back to sign in
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   if (mode === "reset") {
     return (

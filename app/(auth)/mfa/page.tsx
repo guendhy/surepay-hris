@@ -5,10 +5,15 @@ import { MfaClient } from "./mfa-client";
 
 export const metadata: Metadata = { title: "Two-factor verification" };
 
-export default async function MfaPage() {
+// Only these in-app destinations may follow verification.
+const ALLOWED_NEXT = ["/dashboard", "/set-password"];
+
+export default async function MfaPage({ searchParams }: PageProps<"/mfa">) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.aal === "aal2") redirect("/dashboard");
+  const sp = await searchParams;
+  const next = typeof sp.next === "string" && ALLOWED_NEXT.includes(sp.next) ? sp.next : "/dashboard";
+  if (session.aal === "aal2") redirect(next);
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4 py-12">
@@ -19,7 +24,7 @@ export default async function MfaPage() {
             ? "Your role gives access to sensitive employee data, so an authenticator app code is required."
             : "Add an authenticator app to protect your account."}
         </p>
-        <MfaClient email={session.email} />
+        <MfaClient email={session.email} next={next} />
       </div>
     </main>
   );

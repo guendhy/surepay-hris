@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatPeso, fullName, humanize, masked } from "@/lib/format";
 import type { Employee } from "@/lib/types";
 import { ActionForm } from "@/components/ui/action-form";
-import { Alert, Card, CardBody, CardHeader, DescriptionList, Field, Input, PageHeader, Textarea } from "@/components/ui/primitives";
+import { Alert, Card, CardBody, CardHeader, DescriptionList, Field, Input, LinkButton, PageHeader, Textarea } from "@/components/ui/primitives";
 import { updateContactInfo } from "./actions";
 
 export const metadata: Metadata = { title: "My profile" };
@@ -38,6 +38,11 @@ export default async function ProfilePage() {
       <PageHeader
         title={fullName(e)}
         description={`${e.employee_no} · ${e.positions?.title ?? "No position"} · ${e.departments?.name ?? "No department"}`}
+        actions={
+          <LinkButton href="/set-password" variant="secondary">
+            Change password
+          </LinkButton>
+        }
       />
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">

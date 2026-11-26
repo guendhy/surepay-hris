@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { LoginForm } from "./login-form";
-import { publicEnv } from "@/lib/env";
+import { authEmailsEnabled, publicEnv } from "@/lib/env";
 
 export const metadata: Metadata = { title: "Sign in" };
 
@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <p className="text-sm text-muted">Sign in with your company account</p>
           </div>
         </div>
-        <LoginForm next={next} error={error} sso={publicEnv.ssoProvider()} />
+        <LoginForm next={next} error={error} sso={publicEnv.ssoProvider()} resetByEmail={authEmailsEnabled()} />
         <p className="mt-8 text-center text-xs text-muted">
           Authorised Surepay Technologies Inc. personnel only. Activity is logged.
         </p>

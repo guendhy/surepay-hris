@@ -29,7 +29,7 @@
 **Add an employee** — *Employees → Add employee*. The employee number (SPT-YYYY-0001) and regularisation due date are filled in automatically. Then on the employee page:
 - *IDs & pay*: government IDs (stored encrypted; "Reveal" is logged) and compensation (every change needs a reason and goes into salary history).
 - *Documents*: upload contracts, clearances, certificates; set expiry dates.
-- *201 profile*: **Send invitation** so the employee can sign in.
+- *201 profile*: **Send invitation** so the employee can sign in. If email is not set up yet, the button reads **Create invite link** — copy the link and send it to the employee only, in a direct chat message. If a link expires or a password is forgotten, use **Create password reset link** (HR: accounts that never signed in; Super Admin: any account).
 - Changing department, position, supervisor, type or status is recorded automatically in *History*. Setting status to **Separated** disables the employee's login.
 
 **Opening balances at go-live** — employee → *Leave* tab → *Adjust balance* → entry "Opening balance".
@@ -49,4 +49,6 @@
 ## Administrators
 
 - *Users & roles*: grant/revoke roles and disable accounts. Every account automatically has the Employee role. You cannot change your own roles.
+- *Lost authenticator*: in Supabase → Authentication → Users → the user → remove their MFA factor. At the next sign-in they set up a new one.
+- *“That code was not accepted” when setting up MFA*: the user should delete old “Surepay HRIS” entries in their app, check the phone’s date/time is automatic, click *Start over with a new QR code* and scan once.
 - *Audit log*: who changed what and when, plus sign-ins, exports and views of sensitive data. Entries cannot be edited or deleted.

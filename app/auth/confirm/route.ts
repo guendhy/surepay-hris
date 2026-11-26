@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * Email links (invite, password recovery) — configure the Supabase email
  * templates to point here, e.g.
- *   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/me/password
+ *   {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/set-password
  */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl;

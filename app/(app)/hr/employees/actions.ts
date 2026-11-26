@@ -10,7 +10,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { dbError, failure, formToObject, fromZod, success, type ActionState } from "@/lib/action";
 import { compensationSchema, employeeSchema, governmentIdsSchema, safeFileName, validateUpload } from "@/lib/validations";
 import { encryptField, lastFour } from "@/lib/crypto";
-import { publicEnv } from "@/lib/env";
+import { authEmailsEnabled, publicEnv } from "@/lib/env";
+import { createOneTimeLink } from "@/lib/auth/links";
 
 function employeePayload(formData: FormData) {
   const raw = formToObject(formData);
@@ -188,15 +189,68 @@ export async function inviteEmployee(_prev: ActionState, formData: FormData): Pr
   if (!emp) return failure("Employee not found.");
   if (emp.user_id) return failure("This employee already has a login.");
 
+  const fullName = `${emp.first_name} ${emp.last_name}`;
+
+  // Without SMTP, create a one-time link for HR to share instead of emailing.
+  if (!authEmailsEnabled()) {
+    const result = await createOneTimeLink("invite", emp.work_email, fullName);
+    if ("error" in result) return failure(`The invite link could not be created: ${result.error}`);
+    await supabase.rpc("log_event", { p_action: "admin.user_invite_link_created", p_context: { employee_id: id.data } });
+    revalidatePath(`/hr/employees/${id.data}`);
+    return { ...success(`Invite link created for ${emp.work_email}.`), link: result.link };
+  }
+
   const admin = createAdminClient();
   const { error } = await admin.auth.admin.inviteUserByEmail(emp.work_email, {
-    data: { full_name: `${emp.first_name} ${emp.last_name}` },
-    redirectTo: `${publicEnv.appUrl()}/auth/callback?next=/me/password`,
+    data: { full_name: fullName },
+    redirectTo: `${publicEnv.appUrl()}/auth/callback?next=/set-password`,
   });
   if (error) return failure(`The invitation could not be sent: ${error.message}`);
   await supabase.rpc("log_event", { p_action: "admin.user_invited", p_context: { employee_id: id.data } });
   revalidatePath(`/hr/employees/${id.data}`);
   return success(`Invitation sent to ${emp.work_email}.`);
+}
+
+/**
+ * One-time password reset link for an employee who already has a login
+ * (lost password, or an invite link that expired before it was used).
+ * HR may create one only for accounts that have never signed in; for any
+ * other account it takes a Super Admin (admin.users), so HR cannot quietly
+ * take over an active account. The employee is notified either way.
+ */
+export async function createPasswordLink(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const auth = await authorizeAction("employee.invite");
+  if (!auth.ok) return failure(auth.message);
+  const id = z.uuid().safeParse(formData.get("employee_id"));
+  if (!id.success) return failure("Invalid employee.");
+
+  const supabase = await createClient();
+  const { data: emp } = await supabase.from("employees").select("work_email, user_id").eq("id", id.data).single();
+  if (!emp?.user_id) return failure("This employee has no login yet. Create an invite link instead.");
+  if (emp.user_id === auth.session.userId) return failure("Use “Forgot password” or ask another administrator for your own account.");
+
+  const admin = createAdminClient();
+  const { data: authUser, error: lookupError } = await admin.auth.admin.getUserById(emp.user_id);
+  if (lookupError || !authUser?.user) return failure("The login could not be found.");
+  const hasSignedIn = Boolean(authUser.user.last_sign_in_at);
+  if (hasSignedIn && !auth.session.permissions.includes("admin.users")) {
+    return failure("This employee has signed in before. Ask IT (Super Admin) to create the reset link.");
+  }
+
+  const result = await createOneTimeLink("recovery", emp.work_email);
+  if ("error" in result) return failure(`The reset link could not be created: ${result.error}`);
+
+  await supabase.rpc("log_event", {
+    p_action: "admin.password_link_created",
+    p_context: { employee_id: id.data, account_had_signed_in: hasSignedIn },
+  });
+  await admin.from("notifications").insert({
+    user_id: emp.user_id,
+    title: "Password reset link created",
+    body: "A password reset link was created for your account by HR/IT. If you did not ask for this, tell IT right away.",
+    category: "security",
+  });
+  return { ...success("Password reset link created."), link: result.link };
 }
 
 export async function adjustBalance(_prev: ActionState, formData: FormData): Promise<ActionState> {

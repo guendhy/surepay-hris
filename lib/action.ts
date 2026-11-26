@@ -5,6 +5,8 @@ export type ActionState = {
   ok: boolean;
   message?: string;
   fieldErrors?: Record<string, string[] | undefined>;
+  /** One-time sign-in link to show the user (invite / password reset without email). */
+  link?: string;
   /** Changes on every submit so forms can reset after success. */
   at?: number;
 };

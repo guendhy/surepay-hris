@@ -19,12 +19,19 @@ export function PasswordForm() {
     setBusy(true);
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password });
-    setBusy(false);
-    if (error) return setMessage({ ok: false, text: error.message });
+    if (error) {
+      setBusy(false);
+      // Accounts that already have an authenticator must verify it before changing the password.
+      if (/aal2|assurance/i.test(error.message) || error.code === "insufficient_aal") {
+        router.push("/mfa?next=/set-password");
+        return;
+      }
+      return setMessage({ ok: false, text: error.message });
+    }
     await supabase.rpc("log_event", { p_action: "auth.password_changed", p_context: {} });
-    setMessage({ ok: true, text: "Password updated." });
-    setPassword("");
-    setConfirm("");
+    setMessage({ ok: true, text: "Password saved. Taking you to the HRIS…" });
+    // The app layout will ask for an authenticator app next if the role requires it.
+    router.replace("/dashboard");
     router.refresh();
   }
 

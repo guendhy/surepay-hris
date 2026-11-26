@@ -7,15 +7,33 @@ import { Alert, Button, Card, Field, Input } from "@/components/ui/primitives";
 
 type Step =
   | { kind: "loading" }
+  | { kind: "start" }
   | { kind: "enroll"; factorId: string; qr: string; secret: string }
   | { kind: "verify"; factorId: string }
   | { kind: "error"; message: string };
 
+const ISSUER = "Surepay HRIS";
+
+/** Turns Supabase MFA errors into guidance; unknown errors are shown as-is. */
+function explain(error: { message: string; code?: string }): string {
+  const text = `${error.code ?? ""} ${error.message}`.toLowerCase();
+  if (text.includes("invalid") || text.includes("mfa_verification_failed")) {
+    return "That code was not accepted. Use the newest “Surepay HRIS” entry in your app (delete older ones), make sure your phone's date and time are set automatically, and type the code before it changes.";
+  }
+  if (text.includes("expired")) return "The code expired. Enter the current code from your app.";
+  if (text.includes("disabled")) return `Authenticator apps are not enabled for this project (${error.message}). Ask IT to enable TOTP in Supabase → Authentication → Multi-Factor.`;
+  return `Verification failed: ${error.message}`;
+}
+
 /**
  * TOTP enrolment / verification with Supabase Auth MFA. On success the session
  * is upgraded to aal2, which RLS requires for salaries, government IDs, audit.
+ *
+ * Enrolment starts only when the user clicks, and only then is a new secret
+ * created — reloading the page must not silently replace the secret the user
+ * already scanned.
  */
-export function MfaClient({ email }: { email: string }) {
+export function MfaClient({ email, next }: { email: string; next: string }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>({ kind: "loading" });
   const [code, setCode] = useState("");
@@ -28,17 +46,29 @@ export function MfaClient({ email }: { email: string }) {
       const { data, error } = await supabase.auth.mfa.listFactors();
       if (error) return setStep({ kind: "error", message: error.message });
       const verified = data.totp.find((f) => f.status === "verified");
-      if (verified) return setStep({ kind: "verify", factorId: verified.id });
-
-      // Clean up abandoned enrolments, then start a new one.
-      for (const f of data.all.filter((f) => f.status === "unverified")) {
-        await supabase.auth.mfa.unenroll({ factorId: f.id });
-      }
-      const enroll = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: `HRIS ${email}` });
-      if (enroll.error) return setStep({ kind: "error", message: enroll.error.message });
-      setStep({ kind: "enroll", factorId: enroll.data.id, qr: enroll.data.totp.qr_code, secret: enroll.data.totp.secret });
+      setStep(verified ? { kind: "verify", factorId: verified.id } : { kind: "start" });
     })();
-  }, [email]);
+  }, []);
+
+  async function startEnrolment() {
+    setBusy(true);
+    setError(null);
+    setCode("");
+    const supabase = createClient();
+    const { data } = await supabase.auth.mfa.listFactors();
+    // Remove earlier, never-verified attempts so only one secret is live.
+    for (const f of data?.all.filter((f) => f.status === "unverified") ?? []) {
+      await supabase.auth.mfa.unenroll({ factorId: f.id });
+    }
+    const enroll = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      issuer: ISSUER,
+      friendlyName: `Authenticator ${new Date().toISOString().slice(0, 16)}`,
+    });
+    setBusy(false);
+    if (enroll.error) return setStep({ kind: "error", message: explain(enroll.error) });
+    setStep({ kind: "enroll", factorId: enroll.data.id, qr: enroll.data.totp.qr_code, secret: enroll.data.totp.secret });
+  }
 
   async function verify(e: React.FormEvent) {
     e.preventDefault();
@@ -49,36 +79,75 @@ export function MfaClient({ email }: { email: string }) {
     const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: step.factorId, code: code.trim() });
     if (error) {
       setBusy(false);
-      setError("That code did not work. Check your authenticator app and try again.");
+      setError(explain(error));
       return;
     }
     await supabase.rpc("log_event", {
       p_action: step.kind === "enroll" ? "mfa.enrolled" : "mfa.verified",
       p_context: {},
     });
-    router.replace("/dashboard");
+    router.replace(next);
     router.refresh();
   }
 
+  const signOut = (
+    <form action="/auth/signout" method="post" className="mt-3">
+      <Button type="submit" variant="ghost" className="w-full">
+        Sign out
+      </Button>
+    </form>
+  );
+
   if (step.kind === "loading") return <Card className="p-6 text-sm text-muted">Loading…</Card>;
-  if (step.kind === "error") return <Alert tone="danger">{step.message}</Alert>;
+  if (step.kind === "error") {
+    return (
+      <Card className="flex flex-col gap-3 p-6">
+        <Alert tone="danger">{step.message}</Alert>
+        <Button variant="secondary" onClick={() => setStep({ kind: "start" })}>
+          Try again
+        </Button>
+        {signOut}
+      </Card>
+    );
+  }
+
+  if (step.kind === "start") {
+    return (
+      <Card className="flex flex-col gap-4 p-6">
+        <p className="text-sm text-foreground">
+          You&apos;ll need an authenticator app on your phone: Google Authenticator, Microsoft Authenticator or 1Password.
+        </p>
+        <p className="text-sm text-muted">
+          If you already scanned a “Surepay HRIS” code for <strong className="text-foreground">{email}</strong> before, delete that entry from
+          your app first — a new code will replace it.
+        </p>
+        <Button onClick={startEnrolment} disabled={busy}>
+          {busy ? "Preparing…" : "Set up authenticator app"}
+        </Button>
+        {signOut}
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">
       <form onSubmit={verify} className="flex flex-col gap-4">
         {step.kind === "enroll" && (
           <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-foreground">
-              1. Scan this QR code with Google Authenticator, Microsoft Authenticator or 1Password.
-            </p>
+            <p className="text-sm text-foreground">1. In your authenticator app, add an account and scan this QR code.</p>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={step.qr} alt="QR code for your authenticator app" width={180} height={180} className="rounded bg-white p-2" />
             <details className="w-full text-xs text-muted">
               <summary className="cursor-pointer">Can&apos;t scan? Enter this key instead</summary>
               <code className="mt-2 block break-all rounded bg-surface-muted p-2 font-mono text-foreground">{step.secret}</code>
             </details>
-            <p className="self-start text-sm text-foreground">2. Enter the 6-digit code it shows.</p>
+            <p className="self-start text-sm text-foreground">
+              2. Enter the 6-digit code shown under <strong>{ISSUER}</strong>.
+            </p>
           </div>
+        )}
+        {step.kind === "verify" && (
+          <p className="text-sm text-foreground">Enter the 6-digit code from the “{ISSUER}” entry in your authenticator app.</p>
         )}
         <Field label="Authentication code" htmlFor="code">
           <Input
@@ -97,12 +166,16 @@ export function MfaClient({ email }: { email: string }) {
         <Button type="submit" disabled={busy || code.length !== 6}>
           {busy ? "Verifying…" : "Verify"}
         </Button>
+        {step.kind === "enroll" && (
+          <button type="button" onClick={startEnrolment} className="text-xs text-brand hover:underline" disabled={busy}>
+            Start over with a new QR code
+          </button>
+        )}
       </form>
-      <form action="/auth/signout" method="post" className="mt-3">
-        <Button type="submit" variant="ghost" className="w-full">
-          Sign out
-        </Button>
-      </form>
+      {step.kind === "verify" && (
+        <p className="mt-3 text-xs text-muted">Lost your phone? Ask IT (Super Admin) to reset your authenticator.</p>
+      )}
+      {signOut}
     </Card>
   );
 }

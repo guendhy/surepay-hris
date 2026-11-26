@@ -62,7 +62,7 @@ export async function requestPasswordReset(_prev: ActionState, formData: FormDat
   if (!parsed.success) return failure("Enter your work email.");
   const supabase = await createClient();
   await supabase.auth.resetPasswordForEmail(parsed.data.email.toLowerCase(), {
-    redirectTo: `${publicEnv.appUrl()}/auth/callback?next=/me/password`,
+    redirectTo: `${publicEnv.appUrl()}/auth/callback?next=/set-password`,
   });
   // Always the same answer, whether or not the account exists.
   return { ok: true, message: "If that email has an account, a reset link is on its way.", at: Date.now() };

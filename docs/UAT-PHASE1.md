@@ -16,7 +16,7 @@ Run on **staging** with demo data (`npm run seed:demo`). Tick each item and note
 | 8 | Set compensation with a reason | HR | Salary history row created | |
 | 9 | Upload a PDF with an expiry date | HR | Document listed; opens via link | |
 | 10 | Change an employee's supervisor | HR | History tab shows "Supervisor change" | |
-| 11 | Send an invitation | HR | Email received; after setting a password the employee is linked | |
+| 11 | Send an invitation (or create an invite link if `AUTH_EMAILS_ENABLED=false`) | HR | Email arrives in Mailtrap / link opens the set-password page; after setting a password the employee is linked | |
 | 12 | Update own mobile number | Employee | Saved; HR sees the new value | |
 | **Leave filing** |||||
 | 13 | File VL Mon–Fri next month | Employee | Preview shows 5 days and remaining balance; submit succeeds | |

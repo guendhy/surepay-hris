@@ -28,9 +28,12 @@ import {
 } from "@/components/ui/primitives";
 import { EmployeeFields } from "../employee-fields";
 import { RevealId } from "./reveal-id";
+import { OneTimeLinkForm } from "@/components/auth/one-time-link-form";
+import { authEmailsEnabled } from "@/lib/env";
 import {
   adjustBalance,
   archiveDocument,
+  createPasswordLink,
   inviteEmployee,
   saveCompensation,
   saveGovernmentIds,
@@ -106,17 +109,32 @@ export default async function EmployeePage({ params, searchParams }: PageProps<"
 
 async function ProfileTab({ employee, canManage, canInvite }: { employee: Employee; canManage: boolean; canInvite: boolean }) {
   const options = await getOrgOptions();
+  const emails = authEmailsEnabled();
   return (
     <div className="flex flex-col gap-6">
-      {!employee.user_id && canInvite && (
+      {canInvite && (
         <Card>
-          <CardBody className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-sm text-muted">
-              This employee cannot sign in yet. Send an invitation to <strong className="text-foreground">{employee.work_email}</strong>.
-            </p>
-            <ActionForm action={inviteEmployee} submitLabel="Send invitation" submitVariant="secondary" className="flex-row items-center">
-              <input type="hidden" name="employee_id" value={employee.id} />
-            </ActionForm>
+          <CardBody className="flex flex-col gap-3">
+            {!employee.user_id ? (
+              <>
+                <p className="text-sm text-muted">
+                  This employee cannot sign in yet.{" "}
+                  {emails ? (
+                    <>Send an invitation to <strong className="text-foreground">{employee.work_email}</strong>.</>
+                  ) : (
+                    <>Create a one-time invite link and send it to <strong className="text-foreground">{employee.work_email}</strong> yourself — email delivery is not set up yet.</>
+                  )}
+                </p>
+                <OneTimeLinkForm action={inviteEmployee} employeeId={employee.id} label={emails ? "Send invitation" : "Create invite link"} />
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted">
+                  Login: <strong className="text-foreground">{employee.work_email}</strong>. If the employee forgot their password or their invite link expired, create a one-time reset link.
+                </p>
+                <OneTimeLinkForm action={createPasswordLink} employeeId={employee.id} label="Create password reset link" />
+              </>
+            )}
           </CardBody>
         </Card>
       )}
