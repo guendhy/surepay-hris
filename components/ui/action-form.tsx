@@ -71,14 +71,17 @@ export function SubmitButton({
 }: {
   children: ReactNode;
   disabled?: boolean;
-  variant?: "primary" | "secondary" | "danger" | "ghost";
-  size?: "sm" | "md";
+  variant?: "primary" | "secondary" | "danger" | "danger-outline" | "ghost";
+  size?: "sm" | "md" | "lg";
   name?: string;
   value?: string;
 }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" variant={variant} size={size} disabled={pending || disabled} name={name} value={value}>
+    <Button type="submit" variant={variant} size={size} disabled={pending || disabled} name={name} value={value} aria-busy={pending || undefined}>
+      {pending && (
+        <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-80" aria-hidden="true" />
+      )}
       {pending ? "Working…" : children}
     </Button>
   );

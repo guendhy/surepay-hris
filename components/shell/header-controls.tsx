@@ -27,7 +27,7 @@ export function NotificationBell({ userId, initialUnread }: { userId: string; in
   return (
     <Link
       href="/notifications"
-      className="relative rounded-md p-2 text-foreground hover:bg-surface-muted"
+      className="relative inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground/80 hover:bg-surface-muted"
       aria-label={unread > 0 ? `${unread} unread notifications` : "Notifications"}
     >
       <Bell className="h-5 w-5" />
@@ -63,7 +63,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="rounded-md p-2 text-foreground hover:bg-surface-muted"
+      className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground/80 hover:bg-surface-muted"
       aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
     >
       {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
@@ -74,7 +74,7 @@ export function ThemeToggle() {
 export function SignOutButton() {
   return (
     <form action="/auth/signout" method="post">
-      <button type="submit" className="rounded-md p-2 text-foreground hover:bg-surface-muted" aria-label="Sign out">
+      <button type="submit" className="inline-flex size-10 items-center justify-center rounded-[var(--radius-control)] text-foreground/80 hover:bg-surface-muted" aria-label="Sign out">
         <LogOut className="h-5 w-5" />
       </button>
     </form>

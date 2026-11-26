@@ -35,20 +35,33 @@ export function PasswordForm() {
     router.refresh();
   }
 
+  const checks = [
+    { ok: /[a-z]/i.test(password) && /\d/.test(password), label: "Letters and numbers" },
+    { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), label: "Upper and lower case" },
+    { ok: password.length >= 12, label: password.length >= 12 ? "At least 12 characters" : `At least 12 characters (${password.length} so far)` },
+  ];
+
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Field label="New password" htmlFor="password">
-        <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required className="h-11" aria-describedby="pw-rules" />
       </Field>
+      <ul id="pw-rules" className="flex flex-col gap-1 text-[13px]" aria-label="Password requirements">
+        {checks.map((c) => (
+          <li key={c.label} className={c.ok ? "text-success" : "text-muted"}>
+            {c.ok ? "✓" : "○"} {c.label}
+          </li>
+        ))}
+      </ul>
       <Field label="Confirm new password" htmlFor="confirm">
-        <Input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+        <Input id="confirm" type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required className="h-11" />
       </Field>
       {message && <Alert tone={message.ok ? "success" : "danger"}>{message.text}</Alert>}
-      <div>
-        <Button type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Update password"}
-        </Button>
-      </div>
+      {/* Only the length rule is enforced (as before); the other checks are guidance. */}
+      <Button type="submit" size="lg" disabled={busy || password.length < 12}>
+        {busy ? "Saving…" : "Save password"}
+      </Button>
+      <p className="text-xs text-muted">Next: HR, payroll and admin roles are asked to set up an authenticator app.</p>
     </form>
   );
 }

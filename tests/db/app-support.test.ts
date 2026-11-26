@@ -37,6 +37,27 @@ describe("app support functions", () => {
     expect(stats.headcount).toBe(3);
   });
 
+  it("hr_dashboard_stats reports the HR work queue (expiring documents, no login)", async () => {
+    const hr = await createPerson(db, { firstName: "Hope", email: "hope@x.test", roles: ["hr_manager"] });
+    const { rows: emp } = await db.query<{ id: string }>(
+      `insert into public.employees (first_name, last_name, work_email, date_hired) values ('No', 'Login', 'nologin@x.test', '2025-01-01') returning id`,
+    );
+    await db.query(
+      `insert into public.employee_documents (employee_id, document_type, title, storage_path, file_name, expires_on)
+       values ($1::uuid, 'NBI', 'NBI clearance', $2, 'nbi.pdf', current_date + 10)`,
+      [emp[0].id, `${emp[0].id}/documents/nbi.pdf`],
+    );
+    const stats = await db.as(hr.userId, async () => {
+      const { rows } = await db.query<{ s: { expiring_documents: number; no_login: number; escalated_approvals: number } }>(
+        "select public.hr_dashboard_stats() as s",
+      );
+      return rows[0].s;
+    });
+    expect(stats.expiring_documents).toBe(1);
+    expect(stats.no_login).toBe(1);
+    expect(stats.escalated_approvals).toBe(0);
+  });
+
   it("the directory exposes no personal or sensitive columns", async () => {
     const { rows } = await db.query<{ name: string }>(
       `select unnest(proargnames) as name from pg_proc where proname = 'get_employee_directory'`,

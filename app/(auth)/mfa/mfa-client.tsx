@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Alert, Button, Card, Field, Input } from "@/components/ui/primitives";
+import { Alert, Badge, Button, Card, Field, Input, Tag } from "@/components/ui/primitives";
 
 type Step =
   | { kind: "loading" }
@@ -111,17 +111,37 @@ export function MfaClient({ email, next }: { email: string; next: string }) {
     );
   }
 
+  const progress = (current: 1 | 2) => (
+    <ol className="mb-1 flex flex-wrap gap-2" aria-label="Progress">
+      {["Get the app", "Scan", "Verify"].map((label, i) => {
+        const n = i + 1;
+        const tone = n < current ? "success" : n === current || (current === 2 && n === 3) ? "brand" : "neutral";
+        return (
+          <li key={label}>
+            <Badge tone={tone} aria-current={n === current ? "step" : undefined}>
+              {n < current ? `${n} · Done` : `${n} · ${label}`}
+            </Badge>
+          </li>
+        );
+      })}
+    </ol>
+  );
+
   if (step.kind === "start") {
     return (
       <Card className="flex flex-col gap-4 p-6">
-        <p className="text-sm text-foreground">
-          You&apos;ll need an authenticator app on your phone: Google Authenticator, Microsoft Authenticator or 1Password.
-        </p>
+        {progress(1)}
+        <p className="text-sm text-foreground">Install one of these on your phone:</p>
+        <div className="flex flex-wrap gap-1.5">
+          <Tag>Google Authenticator</Tag>
+          <Tag>Microsoft Authenticator</Tag>
+          <Tag>1Password</Tag>
+        </div>
         <p className="text-sm text-muted">
           If you already scanned a “Surepay HRIS” code for <strong className="text-foreground">{email}</strong> before, delete that entry from
           your app first — a new code will replace it.
         </p>
-        <Button onClick={startEnrolment} disabled={busy}>
+        <Button onClick={startEnrolment} disabled={busy} size="lg">
           {busy ? "Preparing…" : "Set up authenticator app"}
         </Button>
         {signOut}
@@ -132,6 +152,7 @@ export function MfaClient({ email, next }: { email: string; next: string }) {
   return (
     <Card className="p-6">
       <form onSubmit={verify} className="flex flex-col gap-4">
+        {step.kind === "enroll" && progress(2)}
         {step.kind === "enroll" && (
           <div className="flex flex-col items-center gap-3">
             <p className="text-sm text-foreground">1. In your authenticator app, add an account and scan this QR code.</p>
